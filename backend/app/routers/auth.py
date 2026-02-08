@@ -89,8 +89,8 @@ async def signup(req: AuthRequest):
 
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Signup failed. Please try again.")
 
 
 @router.post("/login", response_model=AuthResponse)

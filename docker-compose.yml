@@ -1,0 +1,61 @@
+services:
+  # ── Google Trends MCP Server ─────────────────────────────────────────────
+  # Pre-existing MCP server that provides Google Trends/News tools.
+  # The backend connects to this via the Docker network (not localhost).
+  google-trends-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - MCP_JWT_ISSUER=${MCP_JWT_ISSUER}
+      - MCP_JWT_JWKS_URL=${MCP_JWT_JWKS_URL}
+      - MCP_JWT_AUDIENCE=${MCP_JWT_AUDIENCE:-authenticated}
+      - MCP_JWT_ALGORITHMS=${MCP_JWT_ALGORITHMS:-ES256}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ── FastAPI Backend ──────────────────────────────────────────────────────
+  # Handles auth, chat, AI agent, and connects to Supabase + MCP server.
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    environment:
+      # Override MCP URL to use Docker service name (not localhost)
+      - MCP_SERVER_URL=http://google-trends-mcp:8080/mcp/
+      # Override FRONTEND_URL for CORS in Docker
+      - FRONTEND_URL=http://localhost:3000
+    depends_on:
+      google-trends-mcp:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ── React Frontend ───────────────────────────────────────────────────────
+  # Built with Vite, served with nginx on port 3000.
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Tell Vite where the backend is (baked into the JS bundle at build time)
+        VITE_API_URL: http://localhost:8000
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy

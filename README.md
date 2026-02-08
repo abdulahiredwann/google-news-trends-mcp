@@ -2,6 +2,7 @@
 
 An MCP server that fetches Google News articles and Google Trends data, hosted over HTTP.
 testuser2@gmail.com
+Test1234!
 
 cd /home/abd/Downloads/google-news-trends-mcp/backend && source venv/bin/activate && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ## Local run

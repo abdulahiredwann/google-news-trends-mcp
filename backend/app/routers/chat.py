@@ -156,10 +156,9 @@ async def send_message(req: ChatRequest, request: Request):
                 mcp_client = MultiServerMCPClient(config)
                 mcp_tools = await mcp_client.get_tools()
                 logger.info(f"MCP tools loaded: {[t.name for t in mcp_tools]}")
-            except Exception as mcp_err:
-                # MCP server unavailable — log the error but don't crash
-                logger.error(f"MCP connection error: {mcp_err}")
-                logger.error(traceback.format_exc())
+            except Exception:
+                # MCP server unavailable — log server-side only, don't crash
+                logger.warning("MCP connection failed — continuing without Google Trends tools")
                 yield {
                     "event": "tool_status",
                     "data": json.dumps({"type": "info", "message": "Google Trends MCP unavailable, continuing without it"}),
@@ -204,15 +203,17 @@ async def send_message(req: ChatRequest, request: Request):
                     full_response = event["content"]
 
         except ValueError as e:
-            # Missing API key (e.g. OPENAI_API_KEY not set)
-            full_response = f"Configuration error: {str(e)}. Please set your API keys in the backend .env file."
+            # Missing API key — log details server-side only, send generic message to client
+            logger.error(f"Configuration error: {e}")
+            full_response = "Configuration error. Please contact the administrator."
             yield {
                 "event": "token",
                 "data": json.dumps({"content": full_response}),
             }
 
         except Exception:
-            # Unexpected error — return a friendly message, don't leak internals
+            # Unexpected error — log full traceback server-side, send generic message to client
+            logger.error(f"Agent error for user {user_id}: {traceback.format_exc()}")
             full_response = "Sorry, something went wrong processing your request. Please try again."
             yield {
                 "event": "token",
